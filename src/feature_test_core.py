@@ -41,17 +41,12 @@ class FeatureEvent():
         self.tb = self._exc_info_to_string(exc)
         return self
 
-    def _exc_info_to_string(self, err): 
-        """Converts a sys.exc_info()-style tuple of values into a string.""" 
-        exctype, value, tb = sys.exc_info() 
-        # Skip test runner traceback levels 
-        while tb:# and self._is_relevant_tb_level(tb): 
-            tb = tb.tb_next 
-            if exctype is AssertionFailed:
-                # Skip assert*() traceback levels 
-                length = 1#self._count_relevant_tb_levels(tb) 
-                return ''.join(traceback.format_exception(exctype, value, tb, length)) 
-            return ''.join(traceback.format_exception(exctype, value, tb)) 
+    def _exc_info_to_string(self, err):
+        exctype, value, tb = sys.exc_info()
+        tb = tb.tb_next 
+        if exctype is AssertionFailed:
+            return ''.join(traceback.format_exception(exctype, value, tb, 1)) 
+        return ''.join(traceback.format_exception(exctype, value, tb)) 
 
 
 class FeatureTester():
@@ -67,19 +62,19 @@ class FeatureTester():
                 try:
                     await fct()
                 except AssertionFailed as e:
-                    print('F', end='')
+                    print('F', end='', flush=True)
                     events.append(FeatureEvent().set_failure(e))
                     #print(evt)
                 except KeyboardInterrupt: 
                     raise
                 except Exception as e:
-                    print('E', end='')
+                    print('E', end='', flush=True)
                     evt = FeatureEvent()
                     evt.set_error(e)
                     events.append(evt)
                     #print(evt)
                 else:
-                    print('.', end='')
+                    print('.', end='', flush=True)
                     evt = FeatureEvent()
                     evt.set_success()
                     events.append(evt)
@@ -120,6 +115,10 @@ class FeatureTest():
 
     def fail(self, reason=''):
         raise AssertionFailed('fail: ' + reason)
+
+    def assertNone(self, n):
+        if n is not None:
+            raise AssertionFailed('assertNone: {!r} is not None'.format(get_var_name(n)))
 
     def assertNotNone(self, n):
         if n is None:
