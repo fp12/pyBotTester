@@ -20,6 +20,7 @@ async def on_message(message):
     if message.author.id == '150316380992962562' and message.content.startswith('start'):
         await featureTester.start(bot, clients)
 
+
 for b in appConfig['discord']:
     # create a new client
     c = discord.Client()
@@ -34,6 +35,8 @@ async def unit_test_loop():
         if ready[0] == len(clients):
             bot = discord.utils.get(clients[0].get_all_members(), id=appConfig['bot'])
             await featureTester.start(bot, clients)
+            for c in clients:
+                await c.logout()
             return
         else:
             await asyncio.sleep(2)
