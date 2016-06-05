@@ -135,7 +135,91 @@ class TestCase_Tournament(FeatureTest):
         tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + goodName]
         self.assertTrue(len(tourneyRole) == 0)
 
+class TestCase_Tournament_Simple(FeatureTest):
+    def init(self):
+        self.managementChannel = self._testBots[1].get_channel('188517631920308226')
+        self.goodName = 'bot_' + _get_random_name()
+        self.tourneyChannel = None
 
-    
+    async def setup(self):
+        await self._testBots[1].send_message(self.managementChannel, '>>> create ' + self.goodName + ' ' + self.goodName + ' singleelim')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.managementChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        self.tourneyChannel = [c for c in list(self._testBots[1].servers)[0].channels if c.name == 't_' + self.goodName][0]
+        self.assertNotNone(self.tourneyChannel)
+        tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + self.goodName][0]
+        self.assertNotNone(tourneyRole)
+
+    async def test_1_join(self):
+        # Bot 0, 1 & 2 join the tournament
+        await self._testBots[0].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[0].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+    async def test_2_start(self):
+        # Bot 1 starts the tournament
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> start')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+    async def test_3_score_update(self):
+        # Bot 2 update his score against bot 1
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> update 123 bot')
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌')  # wrong score format
+
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 bot')
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌')  # wrong opponent name
+
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 ' + self._testBots[0].user.mention)
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌')  # wrong opponent
+
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 ' + self._testBots[1].user.mention)
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+        # Bot 1 update his score against bot 0
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> update 5-2,2-5,5-4 ' + self._testBots[0].user.mention)
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+    async def test_4_finalize(self):
+        # Bot 1 finalizes the tournament
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> finalize')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+        # Bot 2 can't write on the channel anymore
+        await self.assertRaises(discord.Forbidden, self._testBots[2].send_message, destination=self.tourneyChannel, content='plop')
+
+    async def teardown(self):
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> destroy')
+        result = await self._testBots[1].wait_for_message(timeout=7.0, channel=self.managementChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        self.tourneyChannel = [c for c in list(self._testBots[1].servers)[0].channels if c.name == 't_' + self.goodName]
+        self.assertTrue(len(self.tourneyChannel) == 0)
+        tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + self.goodName]
+        self.assertTrue(len(tourneyRole) == 0)
+
 
 

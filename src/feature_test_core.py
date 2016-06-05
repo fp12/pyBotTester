@@ -57,14 +57,31 @@ class FeatureTester():
         for fcls in FeatureTest.__subclasses__():
             events = []
             f = fcls(bot, testbots)
-            await f.setup()
+            
+            try:
+                await f.setup()
+            except AssertionFailed as e:
+                print('F', end='', flush=True)
+                events.append(FeatureEvent().set_failure(e))
+            except KeyboardInterrupt: 
+                raise
+            except Exception as e:
+                print('E', end='', flush=True)
+                evt = FeatureEvent()
+                evt.set_error(e)
+                events.append(evt)
+            else:
+                print('.', end='', flush=True)
+                evt = FeatureEvent()
+                evt.set_success()
+                events.append(evt)
+
             for name, fct in inspect.getmembers(f, predicate=lambda x: inspect.ismethod(x) and x.__name__.startswith('test_')):
                 try:
                     await fct()
                 except AssertionFailed as e:
                     print('F', end='', flush=True)
                     events.append(FeatureEvent().set_failure(e))
-                    #print(evt)
                 except KeyboardInterrupt: 
                     raise
                 except Exception as e:
@@ -72,23 +89,31 @@ class FeatureTester():
                     evt = FeatureEvent()
                     evt.set_error(e)
                     events.append(evt)
-                    #print(evt)
                 else:
                     print('.', end='', flush=True)
                     evt = FeatureEvent()
                     evt.set_success()
                     events.append(evt)
-                    #print(evt)
-            await f.teardown()
+            
+            try:
+                await f.teardown()
+            except AssertionFailed as e:
+                print('F', end='', flush=True)
+                events.append(FeatureEvent().set_failure(e))
+            except KeyboardInterrupt: 
+                raise
+            except Exception as e:
+                print('E', end='', flush=True)
+                evt = FeatureEvent()
+                evt.set_error(e)
+                events.append(evt)
+            else:
+                print('.', end='', flush=True)
+                evt = FeatureEvent()
+                evt.set_success()
+                events.append(evt)
 
             print('\n' + '\n'.join([str(e) for e in events if e.title != 'Success']))
-            #for event in events:
-            #    if event.title != 'Success':
-            #        print(event.info + ' ' + event.tb)
-            #if len(errors) > 0:
-            #    print(fcls.__name__ + ' errors:\n' + '\n'.join([k + ': ' + str(v) for k, v in errors.items()]))
-            #elif len(failures) > 0:
-            #    print(fcls.__name__ + ' failures:\n' + '\n'.join([k + ': ' + str(v) for k, v in failures.items()]))
 
         print ('**** Feature Tests Done ****')
 
@@ -106,6 +131,10 @@ class FeatureTest():
     def __init__(self, bot, testbots):
         self._bot = bot
         self._testBots = testbots
+        self.init()
+
+    def init(self):
+        pass
 
     async def setup(self):
         pass
@@ -139,5 +168,15 @@ class FeatureTest():
     def assertStartsWith(self, str1, str2):
         if not str1.startswith(str2):
             raise AssertionFailed('assertStartsWith: \'{0!r}\' doesn\'t start with \'{1!r}\''.format(str1, str2))
+
+    async def assertRaises(self, exc, func, **args):
+        try:
+            await func(**args)
+        except exc:
+            pass
+        except Exception:
+            raise
+        else:
+            raise AssertionFailed('assertRaises: \'{0!r}\' doesn\'t raise \'{1!r}\''.format(func.__name__, exc))
 
 
