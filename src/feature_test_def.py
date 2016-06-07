@@ -19,8 +19,20 @@ def _get_random_name_too_long():
 
 
 class TestCase_Settings(FeatureTest):
+    async def test_0_ping(self):
+        defaultChannel = list(self._testBots[0].servers)[0].default_channel
+        await self._testBots[0].send_message(defaultChannel, '>>> ping')
+        result = await self._testBots[0].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
     async def test_1_username(self):
         defaultChannel = list(self._testBots[0].servers)[0].default_channel
+        await self._testBots[0].send_message(defaultChannel, '>>> username')
+        result = await self._testBots[0].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌') # missing parameters
+
         await self._testBots[0].send_message(defaultChannel, '>>> username Bot1' + _get_random_name())
         result1 = await self._testBots[0].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
         self.assertNotNone(result1)
@@ -41,27 +53,13 @@ class TestCase_Settings(FeatureTest):
         self.assertStartsWith(result1.content, '❌') # not enough privileges
 
         privateChannel2 = await self._testBots[1].start_private_message(self._bot)
+        await self._testBots[1].send_message(self._bot, '>>> key qw' + _get_random_key())
+        result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=privateChannel2, author=self._bot)
+        self.assertNotNone(result2)
+        self.assertStartsWith(result2.content, '❌') # bad api key format
+
         await self._testBots[1].send_message(self._bot, '>>> key ' + _get_random_key())
         result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=privateChannel2, author=self._bot)
-        self.assertNotNone(result2)
-        self.assertStartsWith(result2.content, '✅')
-
-    async def test_3_organization(self):
-        privateChannel1 = await self._testBots[0].start_private_message(self._bot)
-        await self._testBots[0].send_message(self._bot, '>>> organization ' + _get_random_name())
-        result1 = await self._testBots[0].wait_for_message(timeout=2.0, channel=privateChannel1, author=self._bot)
-        self.assertNotNone(result1)
-        self.assertStartsWith(result1.content, '❌') # not enough privileges
-
-        privateChannel2 = await self._testBots[1].start_private_message(self._bot)
-        await self._testBots[1].send_message(self._bot, '>>> organization ' + _get_random_name())
-        result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=privateChannel2, author=self._bot)
-        self.assertNotNone(result2)
-        self.assertStartsWith(result2.content, '❌') # enough privileges but wrong channel
-
-        managementChannel = self._testBots[1].get_channel('188517631920308226')
-        await self._testBots[1].send_message(managementChannel, '>>> organization ' + _get_random_name())
-        result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=managementChannel, author=self._bot)
         self.assertNotNone(result2)
         self.assertStartsWith(result2.content, '✅')
 
@@ -169,7 +167,7 @@ class TestCase_Tournament_Simple(FeatureTest):
     async def test_2_start(self):
         # Bot 1 starts the tournament
         await self._testBots[1].send_message(self.tourneyChannel, '>>> start')
-        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=8.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
