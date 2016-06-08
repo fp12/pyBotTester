@@ -16,13 +16,13 @@ def _get_random_key():
 def _get_random_name_too_long():
     return "".join(random.choice(string.ascii_letters) for _ in range(0, 70))
       
-
+C_ManagementChannelId = '189903826982010880'
 
 class TestCase_Settings(FeatureTest):
     async def test_0_ping(self):
-        defaultChannel = list(self._testBots[0].servers)[0].default_channel
-        await self._testBots[0].send_message(defaultChannel, '>>> ping')
-        result = await self._testBots[0].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
+        defaultChannel = list(self._testBots[1].servers)[0].default_channel
+        await self._testBots[1].send_message(defaultChannel, '>>> ping')
+        result = await self._testBots[1].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
@@ -65,8 +65,7 @@ class TestCase_Settings(FeatureTest):
 
 class TestCase_Tournament(FeatureTest):
     async def test_1_promotion_demotion(self):
-        managementChannel = self._testBots[1].get_channel('188517631920308226')
-
+        managementChannel = self._testBots[1].get_channel(C_ManagementChannelId)
         await self._testBots[1].send_message(managementChannel, '>>> promote')
         result = await self._testBots[1].wait_for_message(timeout=2.0, channel=managementChannel, author=self._bot)
         self.assertNotNone(result)
@@ -88,9 +87,9 @@ class TestCase_Tournament(FeatureTest):
         self.assertStartsWith(result.content, '✅')
 
     async def test_2_creation_destruction(self):
-        managementChannel = self._testBots[1].get_channel('188517631920308226')
+        managementChannel = self._testBots[1].get_channel(C_ManagementChannelId)
         await self._testBots[1].send_message(managementChannel, '>>> create')
-        result = await self._testBots[1].wait_for_message(timeout=2.0, channel=managementChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=managementChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # not enough parameters
 
@@ -100,12 +99,12 @@ class TestCase_Tournament(FeatureTest):
         self.assertStartsWith(result.content, '❌')  # name too long
 
         await self._testBots[1].send_message(managementChannel, '>>> create ' + _get_random_name() + ' B@durl swiss')
-        result = await self._testBots[1].wait_for_message(timeout=3.0, channel=managementChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=managementChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # bad url
 
         await self._testBots[1].send_message(managementChannel, '>>> create ' + _get_random_name() + ' ' + _get_random_name() + ' dbleelim')
-        result = await self._testBots[1].wait_for_message(timeout=2.0, channel=managementChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=managementChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # bad type
 
@@ -135,7 +134,7 @@ class TestCase_Tournament(FeatureTest):
 
 class TestCase_Tournament_Simple(FeatureTest):
     def init(self):
-        self.managementChannel = self._testBots[1].get_channel('188517631920308226')
+        self.managementChannel = self._testBots[1].get_channel(C_ManagementChannelId)
         self.goodName = 'bot_' + _get_random_name()
         self.tourneyChannel = None
 
@@ -167,42 +166,42 @@ class TestCase_Tournament_Simple(FeatureTest):
     async def test_2_start(self):
         # Bot 1 starts the tournament
         await self._testBots[1].send_message(self.tourneyChannel, '>>> start')
-        result = await self._testBots[1].wait_for_message(timeout=8.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=20.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
     async def test_3_score_update(self):
         # Bot 2 update his score against bot 1
         await self._testBots[2].send_message(self.tourneyChannel, '>>> update 123 bot')
-        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[2].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # wrong score format
 
         await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 bot')
-        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[2].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # wrong opponent name
 
         await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 ' + self._testBots[0].user.mention)
-        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[2].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌')  # wrong opponent
 
         await self._testBots[2].send_message(self.tourneyChannel, '>>> update 1-23 ' + self._testBots[1].user.mention)
-        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[2].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
         # Bot 1 update his score against bot 0
         await self._testBots[1].send_message(self.tourneyChannel, '>>> update 5-2,2-5,5-4 ' + self._testBots[0].user.mention)
-        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
     async def test_4_finalize(self):
         # Bot 1 finalizes the tournament
         await self._testBots[1].send_message(self.tourneyChannel, '>>> finalize')
-        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        result = await self._testBots[1].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '✅')
 
@@ -218,6 +217,3 @@ class TestCase_Tournament_Simple(FeatureTest):
         self.assertTrue(len(self.tourneyChannel) == 0)
         tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + self.goodName]
         self.assertTrue(len(tourneyRole) == 0)
-
-
-
