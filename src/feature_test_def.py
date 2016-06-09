@@ -3,6 +3,8 @@ import asyncio
 import discord
 import random
 import string
+from config import appConfig
+import datetime
 
 
 def _get_random_name():
@@ -15,8 +17,12 @@ def _get_random_key():
 
 def _get_random_name_too_long():
     return "".join(random.choice(string.ascii_letters) for _ in range(0, 70))
+
+def _get_datetime():
+    now_offset = datetime.datetime.now() + datetime.timedelta(minutes=10)
+    return now_offset.strftime("%Y/%m/%d %H:%M")
       
-C_ManagementChannelId = '189903826982010880'
+C_ManagementChannelId = '190268234371432448'
 
 class TestCase_Settings(FeatureTest):
     async def test_0_ping(self):
@@ -33,15 +39,15 @@ class TestCase_Settings(FeatureTest):
         self.assertNotNone(result)
         self.assertStartsWith(result.content, '❌') # missing parameters
 
-        await self._testBots[0].send_message(defaultChannel, '>>> username Bot1' + _get_random_name())
+        await self._testBots[0].send_message(defaultChannel, '>>> username ' + _get_random_name())
         result1 = await self._testBots[0].wait_for_message(timeout=2.0, channel=defaultChannel, author=self._bot)
         self.assertNotNone(result1)
         self.assertStartsWith(result1.content, '✅')
 
-        privateChannel = await self._testBots[0].start_private_message(self._bot)
+        privateChannel = await self._testBots[1].start_private_message(self._bot)
         self.assertNotNone(privateChannel)
-        await self._testBots[0].send_message(self._bot, '>>> username Bot1' + _get_random_name())
-        result2 = await self._testBots[0].wait_for_message(timeout=2.0, channel=privateChannel, author=self._bot)
+        await self._testBots[1].send_message(self._bot, '>>> username ' + appConfig['challonge']['username'])
+        result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=privateChannel, author=self._bot)
         self.assertNotNone(result2)
         self.assertStartsWith(result2.content, '✅')
 
@@ -58,7 +64,7 @@ class TestCase_Settings(FeatureTest):
         self.assertNotNone(result2)
         self.assertStartsWith(result2.content, '❌') # bad api key format
 
-        await self._testBots[1].send_message(self._bot, '>>> key ' + _get_random_key())
+        await self._testBots[1].send_message(self._bot, '>>> key ' + appConfig['challonge']['key'])
         result2 = await self._testBots[1].wait_for_message(timeout=2.0, channel=privateChannel2, author=self._bot)
         self.assertNotNone(result2)
         self.assertStartsWith(result2.content, '✅')
@@ -207,6 +213,86 @@ class TestCase_Tournament_Simple(FeatureTest):
 
         # Bot 2 can't write on the channel anymore
         await self.assertRaises(discord.Forbidden, self._testBots[2].send_message, destination=self.tourneyChannel, content='plop')
+
+    async def teardown(self):
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> destroy')
+        result = await self._testBots[1].wait_for_message(timeout=7.0, channel=self.managementChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        self.tourneyChannel = [c for c in list(self._testBots[1].servers)[0].channels if c.name == 't_' + self.goodName]
+        self.assertTrue(len(self.tourneyChannel) == 0)
+        tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + self.goodName]
+        self.assertTrue(len(tourneyRole) == 0)
+
+
+class TestCase_Tournament_Checkin(FeatureTest):
+    def init(self):
+        self.managementChannel = self._testBots[1].get_channel(C_ManagementChannelId)
+        self.goodName = 'bot_' + _get_random_name()
+        self.tourneyChannel = None
+
+    async def setup(self):
+        await self._testBots[1].send_message(self.managementChannel, '>>> create ' + self.goodName + ' ' + self.goodName + ' singleelim')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.managementChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        self.tourneyChannel = [c for c in list(self._testBots[1].servers)[0].channels if c.name == 't_' + self.goodName][0]
+        self.assertNotNone(self.tourneyChannel)
+        tourneyRole = [r for r in list(self._testBots[1].servers)[0].roles if r.name == 'Participant_' + self.goodName][0]
+        self.assertNotNone(tourneyRole)
+
+
+    async def test_0_checkin_setup(self):
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> checkin_setup 3012/12/23 12:00 45')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌') # bad date format
+
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> checkin_setup 2012/12/23 32:00 45')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌') # bad time format
+
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> checkin_setup 2016/12/23 12:00 bad')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '❌') # bad duration
+
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> checkin_setup ' + _get_datetime() + ' 5')
+        result = await self._testBots[1].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+
+    async def test_1_join(self):
+        # Bot 0, 1 & 2 join the tournament
+        await self._testBots[0].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[0].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[1].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+        await self._testBots[2].send_message(self.tourneyChannel, '>>> join')
+        result = await self._testBots[2].wait_for_message(timeout=5.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+
+    async def test_2_player_checkin(self):
+        await self._testBots[0].send_message(self.tourneyChannel, '>>> checkin')
+        result = await self._testBots[0].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
+
+    async def test_3_orga_checkin_validate(self):
+        await self._testBots[1].send_message(self.tourneyChannel, '>>> checkin_validate')
+        result = await self._testBots[1].wait_for_message(timeout=10.0, channel=self.tourneyChannel, author=self._bot)
+        self.assertNotNone(result)
+        self.assertStartsWith(result.content, '✅')
+
 
     async def teardown(self):
         await self._testBots[1].send_message(self.tourneyChannel, '>>> destroy')
